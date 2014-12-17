@@ -1,0 +1,69 @@
+# -*- mode: org -*-
+
+* 概要
+stleem は、なんとなくストリーム指向っぽい表記を出来るようにしてるよう
+な気がする Common Lisp パッケージです。
+
+* 背景
+Matz 氏により、 *streem* という、 stream based concurrent scripting
+language なるものの設計が進められています。
+
+https://github.com/matz/streem
+
+それにインスパイヤされた mattn 氏により、 *streeem* という Go 言語での
+実装が行われました。
+
+https://github.com/mattn/streeem
+http://qiita.com/mattn/items/20c7eb056ed8921547a8
+
+それにインスパイヤされた不肖私めも、 Lisp でやりたいなーと思っていたら
+できました。
+
+* Loading
+** 使用しているライブラリ
+- bordeaux-threads
+- lparallel
+
+** Load
+#+BEGIN_SRC lisp
+(load "stleem.asd")
+(asdf:load-system :stleem)
+#+END_SRC
+
+** Sample を走らせる
+#+BEGIN_SRC lisp
+(stleem-example:fizzbuzz)
+#+END_SRC
+
+* 例
+~example.lisp~ に含まれています。
+** cat
+#+BEGIN_SRC lisp
+(defun cat ()
+  (stleem ()
+    stdin
+    stdout))
+#+END_SRC
+
+** FizzBuzz
+#+BEGIN_SRC lisp
+(defun fizzbuzz ()
+  (stleem ()
+    (seq 100)
+    (lambda (x)
+      (cond ((= (mod x 15) 0)
+	     "FizzBuzz")
+	    ((= (mod x 3) 0)
+	     "Fizz")
+	    ((= (mod x 5) 0)
+	     "Buzz")
+	    (t
+	     x)))
+    stdout))
+#+END_SRC
+
+* 状態
+たぶんサンプルしか動きません。
+
+* License
+This software is released under the MIT License, see "LICENSE" file.
