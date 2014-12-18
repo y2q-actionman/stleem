@@ -1,4 +1,4 @@
-#+TITLE: Common Lisp で streem を実装した
+#+TITLE: Common Lisp で streem みたいな書き方を実装してみた
 #+DATE: <2014-12-18 木>
 #+AUTHOR: https://twitter.com/y2q_actionman
 
@@ -18,7 +18,7 @@ streem 言語にインスパイヤされた mattn 氏により、 *streeem* と�
 - https://github.com/mattn/streeem
 - http://qiita.com/mattn/items/20c7eb056ed8921547a8
 
-かっこいいですね。
+なんて素早いんでしょう。かっこいいですね。
 
 ** Common Lisp でのストリーム処理
 Common Lisp で、 UNIX シェルのようなパイプライン処理ってどう組むの？っていう問題提起があります。
@@ -27,7 +27,7 @@ Common Lisp で、 UNIX シェルのようなパイプライン処理ってど�
 
 どうも、あんまり「決定的」な方法がないなー、という気がしてました。
 
-** 僕の事情
+** 筆者の事情
 この日 (2014-12-18) の Lisp Advent Calender のために元々考えてたネタがあったんですが、脳内で放っておいたらどうでもよくなってきて…
 
 なんかもっと面白いことないかな、と思ってきてました。
@@ -101,13 +101,23 @@ Go 言語実装の streeem でも使われており、上記実装解説記事�
 いいなあ。
 
 さて、 ANSI Common Lisp (1994年に標準化)には、並列化 API はありません。
-なんということでしょう。 C言語にも[[http://en.wikipedia.org/wiki/C11_(C_standard_revision)][2011年の規格]]で並列化APIが加わったというこのご時世に。
-(余談: 元々考えていた Lisp Advent Calender のネタというのは、この件について滔々と恨み節を述べる…というものでした。
+なんということでしょう。 C言語にも[[http://en.wikipedia.org/wiki/C11_(C_standard_revision)][2011年の規格]]で並列化APIが加わったという、このご時世ににも関わらず、です。
+
+(余談: 筆者が元々考えていた Lisp Advent Calender のネタというのは、この件について滔々と恨み節を述べる…というものでした。
 この辺の API が加わった Common Lisp 標準の制定を待っています。
 いつまでも。)
 
-とはいえ、各種 ANSI Common Lisp 準拠の Common Lisp 処理系では独自拡張として並列化 API が実装されています。
+とはいえ、各種 ANSI Common Lisp 準拠の Common Lisp 処理系は、大抵、独自拡張として並列化 API を持っています。
 それらを統一して使うための [[http://common-lisp.net/project/bordeaux-threads/][Bordeaux Threads]] というライブラリがあるので、それを使っています。
+
+こんな感じでスレッドが立てられます:
+#+BEGIN_SRC lisp
+;; "Hello, World" を吐くスレッドの作成
+(make-thread #'(lambda () (print "Hello, World!")))
+
+;; スレッドの終了を待つ
+(join-thread *)
+#+END_SRC
 
 *** Channel
 Go 言語には [[http://www.golang-book.com/10/index.htm][channel]] という、スレッド間通信機構があるそうです。
@@ -115,80 +125,127 @@ Go 言語には [[http://www.golang-book.com/10/index.htm][channel]] という�
 いいなあ。
 
 さて、前述の [[http://trac.common-lisp.net/bordeaux-threads/wiki/ApiDocumentation][Bordeaux Threads の API]] には、そんな便利なインターフェイスはありません。
-普通のロックと条件変数しかなく、まあ頑張ればここから組むことも可能かもしれませんが、私めには無理でございます。
+普通のロックと条件変数しかなく、まあ頑張ればここから組むことも可能かもしれませんが、私めには無理でございました。
 
-とはいえ今回の用途では、「要素が投入されるまでブロックして待ってくれるキュー」があれば十分です。
+今回の用途では、「要素が投入されるまでブロックして待ってくれるキュー」があれば十分です。
 そのため、 [[http://lparallel.org/][lparallel]] ライブラリの [[http://lparallel.org/api/queues/][lparallel.queue]] パッケージを使いました。
 
 *** パイプライン化部分の実装コード
-# (stub, 修正済みコードを入れる。コメント追加。)
+#+BEGIN_SRC lisp
+;;; 各スレッドがやること
+(defun make-stleem-thread-function (pipeline-func from-pipe to-pipe end-symbol)
+  #'(lambda ()
+      (unwind-protect
+	   (loop for in = (pipe-pop from-pipe end-symbol) ; 入力 pipe から要素を拾って
+	      until (eq in end-symbol)                    ; EOF なら終了
+	      as out = (funcall pipeline-func in)         ; フィルタ関数を通して
+	      until (eq out end-symbol)                   ; EOF なら終了
+	      do (pipe-push to-pipe out))                 ; 出力 pipe に吐く
+	(pipe-close to-pipe)))) ; エラーが起きても pipe を閉じることを保証 (unwind-protect)
+
+;;; Main loop
+(defun run-stleem (pipeline-funcs
+		   &key (start-symbol t) (end-symbol nil) (extract-values t))
+  (let ((threads nil)
+	(last-pipe nil))
+    (unwind-protect
+	 (loop for pipeline-func in pipeline-funcs ; 各 pipeline を構成する関数について・・
+	    as from-pipe = (make-instance 'constant-pipe :value start-symbol) ; 入力 pipe
+	    then to-pipe
+	    as to-pipe = (make-instance 'tekitou-pipe) ; 出力 pipe
+	    do (push (make-thread                      ; スレッド作成
+		      (make-stleem-thread-function
+		       pipeline-func from-pipe to-pipe end-symbol)
+		      :name "streem worker thread")
+		     threads)
+	    finally
+	      (setf last-pipe to-pipe)
+	      (mapc #'join-thread threads)) ; 全スレッドの終了を待つ
+      (mapc #'destroy-thread threads)) ; エラーで中断してもスレッドを絶対殺す
+    (cond ((null last-pipe)
+	   (values nil nil))
+	  (extract-values
+	   (values (pipe-extract last-pipe) t)) ; 最後の出力 pipe の中身を取り出して返す。
+	  (t
+	   (values last-pipe t)))))
+#+END_SRC
 
 ** 構文解析
 *** S式にしてさぼる
 streem や streeem では、構文解析に多くのコードが割かれています。
 構文解析器を作るというのは相当に手間どる作業であることは、皆々様ご存知だと思います。
 
-そこで思い切って、 *構文を全部S式で記述して下さい* とお願いすることにしました。
+一方 stleem では、思い切って、 *構文を全部S式で記述して下さい* とユーザの皆様にお願いすることにしました。
 これにより、構文解析から解放され、標準的なリスト操作関数だけで実装は完結します。
-(Lisper がS式に閉じこもってしまう一因は、こういう構文解析から解放されたいという願望だと思います。
+
+(余談: Lisper がS式に閉じこもってしまう一因は、こういう構文解析から解放されたいという願望だと思います。
 たぶん。)
+
+**** コード
+#+BEGIN_SRC lisp
+;;; Entry point
+(defmacro stleem ((&key (start-symbol t) (end-symbol nil) (extract-values t))
+		  &body pipelines)
+  `(run-stleem
+    (list ,@pipelines) ; ユーザが渡したS式を詰め直しているだけ!
+    :start-symbol ,start-symbol
+    :end-symbol ,end-symbol
+    :extract-values ,extract-values))
+#+END_SRC
 
 *** シンボルの処遇
 streem の例には、 =STDIN=, =STDOUT= という謎のシンボルがあります。
+これらはどう扱ったものでしょうか。
 
-こいつらを stleem システムで特殊に扱ってあげるのは、妙な複雑度を増してしまいそうです。
-かといって =(STDIN)=, =(STDOUT)= なんて書かせると、「うわああ Lisper だあああ」と言われるんじゃないかな…と被害妄想してしまいます。
+これらだけを stleem で特殊に扱ってあげるのは、妙な複雑度を増してしまいそうです。
+かといって =(STDIN)=, =(STDOUT)= なんて書かせると、 *「うわああ Lisper だあああ」* と言われるんじゃないかな…と筆者は被害妄想してしまいます。
 
-というわけで、 ~define-symbol-macro~ で適当に置きかえるようにしました。
+結局、 ~define-symbol-macro~ で適当に置きかえるようにしました。
 
-*** 構文解析相当部分のコード
-# (stub, 修正済みコードを入れる。コメント追加。)
+**** コード
+#+BEGIN_SRC lisp
+;; 任意 stream への出力用フィルタ
+(defun stleem-write-driver (stream)
+  #'(lambda (obj)
+      (format stream "~&~A~%" obj)
+      obj))
 
-* その他の所感
-** そもそもストリーム処理って？ と Common Lisp の stream
-そもそもストリーム処理って何なんでしょう。
-streem の目指す所は分からんのですが、僕は僕で徒然なるままに思うところを書きます。
+;; stdout というシンボルを、上の関数の呼び出しにおきかえる
+(define-symbol-macro stdout
+    (stleem-write-driver *standard-output*))
+#+END_SRC
 
-*** Unix 的な世界
-UNIX 的なストリームとは:
-- ~read(2)~ するとバイト列が湧いてくる。
-- ~write(2)~ するとバイト列を送り出せる。
-というものであると思っています。
+* 将来性
+こんな感じでストリーム指向っぽい書き方を実装してみたわけですが、僕自身はこれを使わない気がします。
 
-次に Unix Shell Programming でのテキスト処理では、
-このUNIX的なストリームを改行文字 ('\n') で区切って読んで、
-「行」単位で扱うようにした、と考えられます。
-ここで「行」なる概念が登場しましたが、結局は入出力しているブツ自体はバイト列であることに変わりありません。
-なので、 textutils のようにプログラムで相互接続することにおいて問題が少ないのだと思います。
+というのも、 Common Lisp の強力な反復処理記述用 DSL である [[http://common-lisp.net/projects/iterate/index.html][iterate]] との統合を考えたいためです。
 
-*** Common Lisp の stream
-一方、 Common Lisp の stream も、文字やバイトのストリームに過ぎません。
-ストリームからモノを取りだす関数はいくつかあって:
-- ~READ-CHAR~ :: 文字を得る。
-- ~READ-LINE~ :: 一行分の文字列を得る。
-- ~READ~ :: Lisp Reader を使って Lisp オブジェクトを得る。
-これに対応する書き込み側の ~WRITE-CHAR~, ~WRITE-LINE~, ~WRITE~ などがあります。
+前述の例を、それぞれ iterate で書いてみましょう:
+#+BEGIN_SRC lisp
+(defun cat ()
+  (iterate:iter
+    (for l next (read-line *standard-input* nil nil))
+    (while l)
+    (write-line l *standard-output*)))
+#+END_SRC
 
-*** Common Lisp で Unix的な文字列操作ツール?
-これだけ見ると、
-「じゃあ Common Lisp で Unix 的な、文字列を行志向で扱うツール作るの簡単なんじゃないの」
-と思うわけですが…
-Common Lisp は文字列処理にあまり強くありません。
-例えば、P言語みたいな文字列志向の言語だと簡単に使える正規表現ですが、 Common Lisp では少々面倒です。
+#+BEGIN_SRC lisp
+(defun fizzbuzz ()
+  (iterate:iter
+    (for x from 1 to 100)
+    (for y = (cond ((= (mod x 15) 0)
+                    "FizzBuzz")
+                   ((= (mod x 3) 0)
+                    "Fizz")
+                   ((= (mod x 5) 0)
+                    "Buzz")
+                   (t
+                    x)))
+    (print y)))
+#+END_SRC
 
-個人的には、これはあんまり問題だと思っていません。
-なぜなら、Lisp が扱うのが得意なのは Lisp オブジェクト (S式とか) であり、
-~READ~ を掛けて Lisp オブジェクトにしてしまえば、あとはやりたい放題なのですから。
+これを見る限り、 iterate だけで、「もう十分それっぽい」記述が出来ているように感じられてしまっております。
 
-じゃあ 「 stream から ~READ~ して、なんかやって、 ~WRITE~ すればいいのかな」と思うわけですが‥
-例えば ~DEFCLASS~ や ~DEFSTRUCT~ で作ったLisp オブジェクトなどは、単純に ~WRITE~ しても
-~READ~ 可能な表現になりません。 ~PRINT-OBJECT~ メソッドを定義するなどの
+なんか上手いことパイプラインっぽく見えるような項を iterate に導入した方が、既存のコードともっと融和できるんじゃないかな…
 
-
-
-
-
-** iterate の話
-- 多値をどうするのか、要素を捨てる場合はどうするのか、などなどの諸問題ありまくりです。
-
-
+と思いはじめたところで、この記事は終わりです。

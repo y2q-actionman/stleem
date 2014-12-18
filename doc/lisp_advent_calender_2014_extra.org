@@ -1,0 +1,47 @@
+#+TITLE: [[http://qiita.com/advent-calendar/2014/lisp][Lisp Advent Calendar 2014]] の 12/18 担当分の記事からのカット部分
+#+DATE: <2014-12-18 木>
+#+AUTHOR: https://twitter.com/y2q_actionman
+
+この文章は、 [[http://qiita.com/advent-calendar/2014/lisp][Lisp Advent Calendar 2014]] の 12/18 担当分の記事として書かれませんでした。
+
+** そもそもストリーム処理って？ と Common Lisp の stream
+そもそもストリーム処理って何なんでしょう。
+streem の目指す所は分からんのですが、僕は僕で徒然なるままに思うところを書きます。
+
+*** Unix 的な世界
+UNIX 的なストリームとは:
+- ~read(2)~ するとバイト列が湧いてくる。
+- ~write(2)~ するとバイト列を送り出せる。
+というものであると思っています。
+
+次に Unix Shell Programming でのテキスト処理では、
+このUNIX的なストリームを改行文字 ('\n') で区切って読んで、
+「行」単位で扱うようにした、と考えられます。
+ここで「行」なる概念が登場しましたが、結局は入出力しているブツ自体はバイト列であることに変わりありません。
+なので、 textutils のようにプログラムで相互接続することにおいて問題が少ないのだと思います。
+
+*** Common Lisp の stream
+一方、 Common Lisp の stream も、文字やバイトのストリームに過ぎません。
+ストリームからモノを取りだす関数はいくつかあって:
+- ~READ-CHAR~ :: 文字を得る。
+- ~READ-LINE~ :: 一行分の文字列を得る。
+- ~READ~ :: Lisp Reader を使って Lisp オブジェクトを得る。
+これに対応する書き込み側の ~WRITE-CHAR~, ~WRITE-LINE~, ~WRITE~ などがあります。
+
+*** Common Lisp で Unix的な文字列操作ツール?
+これだけ見ると、
+「じゃあ Common Lisp で Unix 的な、文字列を行志向で扱うツール作るの簡単なんじゃないの」
+と思うわけですが…
+Common Lisp は文字列処理にあまり強くありません。
+例えば、P言語みたいな文字列志向の言語だと簡単に使える正規表現ですが、 Common Lisp では少々面倒です。
+
+個人的には、これはあんまり問題だと思っていません。
+なぜなら、Lisp が扱うのが得意なのは Lisp オブジェクト (S式とか) であり、
+~READ~ を掛けて Lisp オブジェクトにしてしまえば、あとはやりたい放題なのですから。
+
+じゃあ 「 stream から ~READ~ して、なんかやって、 ~WRITE~ すればいいのかな」と思うわけですが‥
+例えば ~DEFCLASS~ や ~DEFSTRUCT~ で作ったLisp オブジェクトなどは、単純に ~WRITE~ しても
+~READ~ 可能な表現になりません。 ~PRINT-OBJECT~ メソッドを定義するなどの
+
+
+
