@@ -13,21 +13,28 @@
 ;;; Main loop
 (defun run-stleem (pipeline-funcs
 		   &key (start-symbol t) (end-symbol nil) (extract-values t))
-  (loop for pipeline-func in pipeline-funcs
-     as from-pipe = (make-instance 'constant-pipe :value start-symbol)
-     then to-pipe
-     as to-pipe = (make-instance 'tekitou-pipe)
-     collect (make-thread
-	      (make-stleem-thread-function
-	       pipeline-func from-pipe to-pipe end-symbol)
-	      :name "streem worker thread")
-     into threads
-     finally
-       (mapc #'join-thread threads)
-       (return
-	 (if extract-values
-	     (pipe-extract to-pipe)
-	     to-pipe))))
+  (let ((threads nil)
+	(last-pipe nil))
+    (unwind-protect
+	 (loop for pipeline-func in pipeline-funcs
+	    as from-pipe = (make-instance 'constant-pipe :value start-symbol)
+	    then to-pipe
+	    as to-pipe = (make-instance 'tekitou-pipe)
+	    do (push (make-thread
+		      (make-stleem-thread-function
+		       pipeline-func from-pipe to-pipe end-symbol)
+		      :name "streem worker thread")
+		     threads)
+	    finally
+	      (setf last-pipe to-pipe)
+	      (mapc #'join-thread threads))
+      (mapc #'destroy-thread threads))
+    (cond ((null last-pipe)
+	   (values nil nil))
+	  (extract-values
+	   (values (pipe-extract last-pipe) t))
+	  (t
+	   (values last-pipe t)))))
 
 ;;; Entry point
 (defmacro stleem ((&key (start-symbol t) (end-symbol nil) (extract-values t))
