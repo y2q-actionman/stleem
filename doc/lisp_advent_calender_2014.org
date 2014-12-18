@@ -1,0 +1,194 @@
+#+TITLE: Common Lisp で streem を実装した
+#+DATE: <2014-12-18 木>
+#+AUTHOR: https://twitter.com/y2q_actionman
+
+この文章は、 [[http://qiita.com/advent-calendar/2014/lisp][Lisp Advent Calendar 2014]] の 12/18 担当分の記事として書かれました。
+
+* 背景(順不同)
+** streem 言語
+Matz 氏により、 *streem* という、 stream based concurrent scripting language なるものの設計が進められています。
+
+- https://github.com/matz/streem
+
+面白そうですね。
+
+** streeem 言語
+streem 言語にインスパイヤされた mattn 氏により、 *streeem* という Go 言語での実装が行われました。
+
+- https://github.com/mattn/streeem
+- http://qiita.com/mattn/items/20c7eb056ed8921547a8
+
+かっこいいですね。
+
+** Common Lisp でのストリーム処理
+Common Lisp で、 UNIX シェルのようなパイプライン処理ってどう組むの？っていう問題提起があります。
+
+- http://ja.stackoverflow.com/questions/1724/unix%E3%81%AE%E3%83%91%E3%82%A4%E3%83%97%E5%87%A6%E7%90%86%E3%81%AE%E3%82%88%E3%81%86%E3%81%AB%E3%82%B9%E3%83%88%E3%83%AA%E3%83%BC%E3%83%A0%E3%82%92%E6%89%B1%E3%81%84%E3%81%9F%E3%81%84
+
+どうも、あんまり「決定的」な方法がないなー、という気がしてました。
+
+** 僕の事情
+この日 (2014-12-18) の Lisp Advent Calender のために元々考えてたネタがあったんですが、脳内で放っておいたらどうでもよくなってきて…
+
+なんかもっと面白いことないかな、と思ってきてました。
+
+** 結果
+*[[http://dic.nicovideo.jp/a/%E4%BD%95%E3%81%8B%E3%82%8F%E3%81%8B%E3%82%89%E3%82%93%E3%81%8C%E3%81%8F%E3%82%89%E3%81%88%E3%83%83!][何かようわからんが、 Lisp に寄せて streem 実装してみるか]]*
+
+コードを書きました。 https://github.com/y2q-actionman/stleem
+
+名前は、 *stleem* にしました。これは、 僕が l と r の発音上の区別が付かない [[http://ja.wikipedia.org/wiki/Engrish][Engrish]] 野郎であることに由来しています。
+
+* コード例
+本家 streem の例にある FizzBuzz から。
+#+BEGIN_SRC lisp
+(defun fizzbuzz ()
+  (stleem ()
+    (seq 100)
+    (lambda (x)
+      (cond ((= (mod x 15) 0)
+	     "FizzBuzz")
+	    ((= (mod x 3) 0)
+	     "Fizz")
+	    ((= (mod x 5) 0)
+	     "Buzz")
+	    (t
+	     x)))
+    stdout))
+#+END_SRC
+
+これにより、
+1. 1 から 100 まで列挙。
+2. 3 や 5 の倍数だった置きかえる。
+3. 標準出力に書く
+4. 結果のリストを得る。
+ことが達成されます。
+
+実行結果は以下です。
+#+BEGIN_EXAMPLE
+STLEEM-EXAMPLE> (fizzbuzz)
+1
+2
+Fizz
+4
+Buzz
+Fizz
+7
+8
+Fizz
+Buzz
+
+;; 中略
+
+Fizz
+Buzz
+(1 2 "Fizz" 4 "Buzz" "Fizz" 7 8 "Fizz" "Buzz" 11 "Fizz" 13 14
+ "FizzBuzz" 16 17 "Fizz" 19 "Buzz" "Fizz" 22 23 "Fizz" "Buzz" 26 "Fizz"
+ 28 29 "FizzBuzz" 31 32 "Fizz" 34 "Buzz" "Fizz" 37 38 "Fizz" "Buzz" 41
+ "Fizz" 43 44 "FizzBuzz" 46 47 "Fizz" 49 "Buzz" "Fizz" 52 53 "Fizz"
+ "Buzz" 56 "Fizz" 58 59 "FizzBuzz" 61 62 "Fizz" 64 "Buzz" "Fizz" 67 68
+ "Fizz" "Buzz" 71 "Fizz" 73 74 "FizzBuzz" 76 77 "Fizz" 79 "Buzz" "Fizz"
+ 82 83 "Fizz" "Buzz" 86 "Fizz" 88 89 "FizzBuzz" 91 92 "Fizz" 94 "Buzz"
+ "Fizz" 97 98 "Fizz" "Buzz")
+STLEEM-EXAMPLE> 
+#+END_EXAMPLE
+
+* 実装
+** 並列化
+*** Threading
+Go 言語には [[https://gobyexample.com/goroutines][goroutine]] という、言語に密に結合された並列化機構があるそうです。
+Go 言語実装の streeem でも使われており、上記実装解説記事ではまるで空気のように使われています。
+いいなあ。
+
+さて、 ANSI Common Lisp (1994年に標準化)には、並列化 API はありません。
+なんということでしょう。 C言語にも[[http://en.wikipedia.org/wiki/C11_(C_standard_revision)][2011年の規格]]で並列化APIが加わったというこのご時世に。
+(余談: 元々考えていた Lisp Advent Calender のネタというのは、この件について滔々と恨み節を述べる…というものでした。
+この辺の API が加わった Common Lisp 標準の制定を待っています。
+いつまでも。)
+
+とはいえ、各種 ANSI Common Lisp 準拠の Common Lisp 処理系では独自拡張として並列化 API が実装されています。
+それらを統一して使うための [[http://common-lisp.net/project/bordeaux-threads/][Bordeaux Threads]] というライブラリがあるので、それを使っています。
+
+*** Channel
+Go 言語には [[http://www.golang-book.com/10/index.htm][channel]] という、スレッド間通信機構があるそうです。
+同じく streeem で使われており、これもまた空気のように使われています。
+いいなあ。
+
+さて、前述の [[http://trac.common-lisp.net/bordeaux-threads/wiki/ApiDocumentation][Bordeaux Threads の API]] には、そんな便利なインターフェイスはありません。
+普通のロックと条件変数しかなく、まあ頑張ればここから組むことも可能かもしれませんが、私めには無理でございます。
+
+とはいえ今回の用途では、「要素が投入されるまでブロックして待ってくれるキュー」があれば十分です。
+そのため、 [[http://lparallel.org/][lparallel]] ライブラリの [[http://lparallel.org/api/queues/][lparallel.queue]] パッケージを使いました。
+
+*** パイプライン化部分の実装コード
+# (stub, 修正済みコードを入れる。コメント追加。)
+
+** 構文解析
+*** S式にしてさぼる
+streem や streeem では、構文解析に多くのコードが割かれています。
+構文解析器を作るというのは相当に手間どる作業であることは、皆々様ご存知だと思います。
+
+そこで思い切って、 *構文を全部S式で記述して下さい* とお願いすることにしました。
+これにより、構文解析から解放され、標準的なリスト操作関数だけで実装は完結します。
+(Lisper がS式に閉じこもってしまう一因は、こういう構文解析から解放されたいという願望だと思います。
+たぶん。)
+
+*** シンボルの処遇
+streem の例には、 =STDIN=, =STDOUT= という謎のシンボルがあります。
+
+こいつらを stleem システムで特殊に扱ってあげるのは、妙な複雑度を増してしまいそうです。
+かといって =(STDIN)=, =(STDOUT)= なんて書かせると、「うわああ Lisper だあああ」と言われるんじゃないかな…と被害妄想してしまいます。
+
+というわけで、 ~define-symbol-macro~ で適当に置きかえるようにしました。
+
+*** 構文解析相当部分のコード
+# (stub, 修正済みコードを入れる。コメント追加。)
+
+* その他の所感
+** そもそもストリーム処理って？ と Common Lisp の stream
+そもそもストリーム処理って何なんでしょう。
+streem の目指す所は分からんのですが、僕は僕で徒然なるままに思うところを書きます。
+
+*** Unix 的な世界
+UNIX 的なストリームとは:
+- ~read(2)~ するとバイト列が湧いてくる。
+- ~write(2)~ するとバイト列を送り出せる。
+というものであると思っています。
+
+次に Unix Shell Programming でのテキスト処理では、
+このUNIX的なストリームを改行文字 ('\n') で区切って読んで、
+「行」単位で扱うようにした、と考えられます。
+ここで「行」なる概念が登場しましたが、結局は入出力しているブツ自体はバイト列であることに変わりありません。
+なので、 textutils のようにプログラムで相互接続することにおいて問題が少ないのだと思います。
+
+*** Common Lisp の stream
+一方、 Common Lisp の stream も、文字やバイトのストリームに過ぎません。
+ストリームからモノを取りだす関数はいくつかあって:
+- ~READ-CHAR~ :: 文字を得る。
+- ~READ-LINE~ :: 一行分の文字列を得る。
+- ~READ~ :: Lisp Reader を使って Lisp オブジェクトを得る。
+これに対応する書き込み側の ~WRITE-CHAR~, ~WRITE-LINE~, ~WRITE~ などがあります。
+
+*** Common Lisp で Unix的な文字列操作ツール?
+これだけ見ると、
+「じゃあ Common Lisp で Unix 的な、文字列を行志向で扱うツール作るの簡単なんじゃないの」
+と思うわけですが…
+Common Lisp は文字列処理にあまり強くありません。
+例えば、P言語みたいな文字列志向の言語だと簡単に使える正規表現ですが、 Common Lisp では少々面倒です。
+
+個人的には、これはあんまり問題だと思っていません。
+なぜなら、Lisp が扱うのが得意なのは Lisp オブジェクト (S式とか) であり、
+~READ~ を掛けて Lisp オブジェクトにしてしまえば、あとはやりたい放題なのですから。
+
+じゃあ 「 stream から ~READ~ して、なんかやって、 ~WRITE~ すればいいのかな」と思うわけですが‥
+例えば ~DEFCLASS~ や ~DEFSTRUCT~ で作ったLisp オブジェクトなどは、単純に ~WRITE~ しても
+~READ~ 可能な表現になりません。 ~PRINT-OBJECT~ メソッドを定義するなどの
+
+
+
+
+
+** iterate の話
+- 多値をどうするのか、要素を捨てる場合はどうするのか、などなどの諸問題ありまくりです。
+
+
