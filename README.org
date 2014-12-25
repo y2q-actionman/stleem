@@ -1,28 +1,31 @@
 # -*- mode: org -*-
 
 * 概要 / Abstract
-*stleem* は、なんとなくストリーム指向っぽい表記を出来るようにしてるよう
-な気がする Common Lisp パッケージです。
+*stleem* は、なんとなくストリーム指向っぽい表記を出来るようにしてるような気がする Common Lisp パッケージです。
 
-*stleem* is a Common Lisp package providing a notation to be felt like
-a somehow stream-oriented one.
+*stleem* is a Common Lisp package providing a notation to be felt like a somehow stream-oriented one.
 
 * 背景 / Background
-Matz 氏により、 *streem* という、 stream based concurrent scripting
-language なるものの設計が進められています。
+Matz 氏により、 *streem* という、 stream based concurrent scripting language なるものの設計が進められています。
+
 https://github.com/matz/streem
-それにインスパイヤされた mattn 氏により、 *streeem* という Go 言語での
-実装が行われました。
+
+それにインスパイヤされた mattn 氏により、 *streeem* という Go 言語での実装が行われました。
+
 https://github.com/mattn/streeem
-それにインスパイヤされた不肖私めも、 Lisp でやりたいなーと思っていたら
-できました。
+
+それにインスパイヤされた不肖私めも、 Lisp でやりたいなーと思っていたらできました。
+
 
 Matz is designing *streem*, a "stream based concurrent scrupting" language.
+
 https://github.com/matz/streem
+
 Mattn is inspired and implemented *streeem* by the Go language.
+
 https://github.com/mattn/streeem
-As expected, I am inspired. I implemented that with a Lispy syntax
-because I want to do it with Lisp.
+
+As expected, I am inspired. I implemented that with a Lispy syntax because I want to do it with Lisp.
 
 * Loading
 ** 使用しているライブラリ / Used libraries.
