@@ -17,7 +17,7 @@ https://github.com/mattn/streeem
 それにインスパイヤされた不肖私めも、 Lisp でやりたいなーと思っていたらできました。
 
 
-Matz is designing *streem*, a "stream based concurrent scrupting" language.
+Matz is designing *streem*, a "stream based concurrent scripting" language.
 
 https://github.com/matz/streem
 
@@ -81,6 +81,7 @@ These are contained in ~example.lisp~.
 - パイプラインを閉じる場合、 デフォルトでは ~nil~ を返すことで閉じられます (例: ~seq~ 関数) 。
 - パイプラインを閉じる時の値は、 ~stleem~ の起動パラメータ ~:end-symbol~ で変えられます。
 
+
 - Any number of functions taking one argument can be placed between ~(stleem ()~ and ~)~.
 - When doing like a filter, you can place a function processes its argument. (ex: the lambda expression in ~fizzbuzz~)
 - When doing like a generator, you can place a function generates a value and ignores its argument. (ex: the ~seq~ function)
@@ -90,6 +91,7 @@ These are contained in ~example.lisp~.
 ** 実装状況 / Implementation Status
 - でも、動かしてみたのはサンプルだけです。
 - 多値をどうするのか、要素を捨てる場合はどうするのか、などなどの諸問題ありまくりです。
+
 
 - Working codes are only these examples.
 - There are many problems for design. For instance, the multiple values, how to drop elements, and so on.
