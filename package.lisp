@@ -7,5 +7,5 @@
 
 (defpackage #:stleem-example
   (:use #:cl #:stleem)
-  (:export #:cat #:copy-with-cat #:fizzbuzz))
+  (:export #:cat #:copy-with-cat #:hello #:fizzbuzz))
   

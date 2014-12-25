@@ -6,7 +6,7 @@
   :author "YOKOTA Yuki <y2q.actionman@gmail.com>"
   :depends-on (#:bordeaux-threads #:lparallel)
   :components ((:file "package")
-	       (:file "pipe")
-	       (:file "main-loop")
-	       (:file "drivers")
-	       (:file "example")))
+	       (:file "pipe" :depends-on ("package"))
+	       (:file "drivers" :depends-on ("package"))
+	       (:file "main-loop" :depends-on ("pipe" "drivers"))
+	       (:file "example" :depends-on ("main-loop"))))

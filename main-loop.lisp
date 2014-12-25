@@ -11,15 +11,21 @@
 	(pipe-close to-pipe))))
 
 ;;; Main loop
-(defun run-stleem (pipeline-funcs
+(defun run-stleem (pipeline-start pipeline-funcs
 		   &key (start-symbol t) (end-symbol nil) (extract-values t))
   (let ((threads nil)
+	(first-pipe
+	 (etypecase pipeline-start
+	   (sequence
+	    (make-instance 'sequence-pipe :sequence pipeline-start))
+	   (function
+	    (push pipeline-start pipeline-funcs)
+	    (make-instance 'constant-pipe :value start-symbol))))
 	(last-pipe nil))
     (unwind-protect
 	 (loop for pipeline-func in pipeline-funcs
-	    as from-pipe = (make-instance 'constant-pipe :value start-symbol)
-	    then to-pipe
-	    as to-pipe = (make-instance 'tekitou-pipe)
+	    as from-pipe = first-pipe then to-pipe
+	    as to-pipe = (make-instance 'queue-pipe)
 	    do (push (make-thread
 		      (make-stleem-thread-function
 		       pipeline-func from-pipe to-pipe end-symbol)
@@ -40,7 +46,8 @@
 (defmacro stleem ((&key (start-symbol t) (end-symbol nil) (extract-values t))
 		  &body pipelines)
   `(run-stleem
-    (list ,@pipelines)
+    ,(first pipelines)
+    (list ,@(rest pipelines))
     :start-symbol ,start-symbol
     :end-symbol ,end-symbol
     :extract-values ,extract-values))

@@ -14,6 +14,11 @@
 	    (*standard-output* ostream))
 	(cat)))))
 
+(defun hello ()
+  (stleem ()
+    '("Hello, World")
+    stdout))
+
 (defun fizzbuzz ()
   (stleem ()
     (seq 100)
