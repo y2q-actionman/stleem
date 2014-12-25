@@ -1,26 +1,31 @@
 # -*- mode: org -*-
 
-* 概要
-stleem は、なんとなくストリーム指向っぽい表記を出来るようにしてるよう
+* 概要 / Abstract
+*stleem* は、なんとなくストリーム指向っぽい表記を出来るようにしてるよう
 な気がする Common Lisp パッケージです。
 
-* 背景
+*stleem* is a Common Lisp package providing a notation to be felt like
+a somehow stream-oriented one.
+
+* 背景 / Background
 Matz 氏により、 *streem* という、 stream based concurrent scripting
 language なるものの設計が進められています。
-
 https://github.com/matz/streem
-
 それにインスパイヤされた mattn 氏により、 *streeem* という Go 言語での
 実装が行われました。
-
 https://github.com/mattn/streeem
-http://qiita.com/mattn/items/20c7eb056ed8921547a8
-
 それにインスパイヤされた不肖私めも、 Lisp でやりたいなーと思っていたら
 できました。
 
+Matz is designing *streem*, a "stream based concurrent scrupting" language.
+https://github.com/matz/streem
+Mattn is inspired and implemented *streeem* by the Go language.
+https://github.com/mattn/streeem
+As expected, I am inspired. I implemented that with a Lispy syntax
+because I want to do it with Lisp.
+
 * Loading
-** 使用しているライブラリ
+** 使用しているライブラリ / Used libraries.
 - bordeaux-threads
 - lparallel
 
@@ -30,13 +35,16 @@ http://qiita.com/mattn/items/20c7eb056ed8921547a8
 (asdf:load-system :stleem)
 #+END_SRC
 
-** Sample を走らせる
+** Sample を走らせる / Running samples
 #+BEGIN_SRC lisp
 (stleem-example:fizzbuzz)
 #+END_SRC
 
-* 例
+* 例 / Examples
 ~example.lisp~ に含まれています。
+
+These are contained in ~example.lisp~.
+
 ** cat
 #+BEGIN_SRC lisp
 (defun cat ()
@@ -62,16 +70,26 @@ http://qiita.com/mattn/items/20c7eb056ed8921547a8
     stdout))
 #+END_SRC
 
-* 状態
-** 仕様
+* 現状 / Current Status
+** 仕様 / Specifications
 - ~(stleem ()~ と ~)~ の間に、任意個の「一つ値を取って、一つ値を返す」関数を並べられます。
-- 各関数で引数を加工して返すようにすれば、フィルタっぽい振る舞いになります (例: fizzbuzz 中のラムダ式) 。
-- 引数を無視して値を生成すれば、 generator っぽい振る舞いになります (例: seq 関数) 。
-- パイプラインを閉じる場合、 デフォルトでは nil を返すことで閉じられます (例: seq 関数) 。
+- 各関数で引数を加工して返すようにすれば、フィルタっぽい振る舞いになります (例: ~fizzbuzz~ 中のラムダ式) 。
+- 引数を無視して値を生成すれば、 generator っぽい振る舞いになります (例: ~seq~ 関数) 。
+- パイプラインを閉じる場合、 デフォルトでは ~nil~ を返すことで閉じられます (例: ~seq~ 関数) 。
 - パイプラインを閉じる時の値は、 ~stleem~ の起動パラメータ ~:end-symbol~ で変えられます。
-** 現状
+
+- Any number of functions taking one argument can be placed between ~(stleem ()~ and ~)~.
+- When doing like a filter, you can place a function processes its argument. (ex: the lambda expression in ~fizzbuzz~)
+- When doing like a generator, you can place a function generates a value and ignores its argument. (ex: the ~seq~ function)
+- When closing the pipeline, you can return ~nil~, by default, from functions. (ex: the ~seq~ function)
+- The value for closing pipeline can be changed by the ~:end-symbol~ parameter of ~stleem~.
+
+** 実装状況 / Implementation Status
 - でも、動かしてみたのはサンプルだけです。
 - 多値をどうするのか、要素を捨てる場合はどうするのか、などなどの諸問題ありまくりです。
+
+- Working codes are only these examples.
+- There are many problems for design. For instance, the multiple values, how to drop elements, and so on.
 
 * License
 This software is released under the MIT License, see "LICENSE" file.
