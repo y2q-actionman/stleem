@@ -5,7 +5,7 @@
   (format t "~&~A~%" obj)
   obj)
 
-(define-filter stdin (_ &optional (*standard-input* *standard-input*))
+(define-filter stdin (_)
   (declare (ignore _))
   (read-line *standard-input* nil nil))
 
