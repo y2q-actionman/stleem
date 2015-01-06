@@ -1,13 +1,13 @@
 (in-package :stleem)
 
 ;;; Drivers
-(define-filter stdout (obj)
-  (format t "~&~A~%" obj)
+(define-filter (stdout &optional (out *standard-output*)) (obj)
+  (format out "~&~A~%" obj)
   obj)
 
-(define-filter stdin (_)
+(define-filter (stdin &optional (in *standard-input*)) (_)
   (declare (ignore _))
-  (read-line *standard-input* nil nil))
+  (read-line in nil nil))
 
 #+ignore
 (defun seq (n-max)

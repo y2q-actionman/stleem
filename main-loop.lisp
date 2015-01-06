@@ -10,16 +10,22 @@
 	      do (pipe-push to-pipe out))
 	(pipe-close to-pipe))))
 
-(defmacro filter-lambda-function ((arg-name) &body body)
-  `(flet ((filter-function (,arg-name)
-	    ,@body))
-     #'(lambda (from-pipe to-pipe end-symbol)
-   	 (make-stleem-thread-function
-	  #'filter-function from-pipe to-pipe end-symbol))))
+(defmacro filter-lambda-function ((&rest args) (filter-arg) &body body)
+  `#'(lambda (,@args)
+       #'(lambda (from-pipe to-pipe end-symbol)
+	   (make-stleem-thread-function #'(lambda (,filter-arg) ,@body)
+					from-pipe to-pipe end-symbol))))
 
-(defmacro define-filter (name (arg-name) &body body)
-  `(setf (fdefinition ',name)
-	 (filter-lambda-function (,arg-name) ,@body)))
+(defmacro define-filter (func-spec (filter-arg) &body body)
+  (etypecase func-spec
+    (list
+     (let ((name (first func-spec))
+	   (args (rest func-spec)))
+       `(setf (fdefinition ',name)
+	      (filter-lambda-function (,@args) (,filter-arg) ,@body))))
+    (symbol
+     `(setf (fdefinition ',func-spec)
+	    (filter-lambda-function nil (,filter-arg) ,@body)))))
 
 ;;; Main loop
 (defun run-stleem (pipeline-start pipeline-funcs
@@ -58,10 +64,10 @@
 		  &body pipelines)
   (flet ((trans-pipe-filter (filter) 	; should be rewrited//
 	   (cond ((symbolp filter)
-		  `(function ,filter))
+		  `(,filter))
 		 ((and (listp filter)
 		       (eq (first filter) 'lambda))
-		  `(filter-lambda-function ,@(rest filter)))
+		  `(funcall (filter-lambda-function nil ,@(rest filter))))
 		 (t
 		  filter))))
     `(run-stleem
