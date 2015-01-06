@@ -1,16 +1,15 @@
 (in-package :stleem)
 
 ;;; Drivers
-(defun stleem-write-driver (stream)
-  #'(lambda (obj)
-      (format stream "~&~A~%" obj)
-      obj))
+(define-filter stdout (obj)
+  (format t "~&~A~%" obj)
+  obj)
 
-(defun stleem-read-line-driver (stream)
-  #'(lambda (_)
-      (declare (ignore _))
-      (read-line stream nil nil)))
+(define-filter stdin (_ &optional (*standard-input* *standard-input*))
+  (declare (ignore _))
+  (read-line *standard-input* nil nil))
 
+#+ignore
 (defun seq (n-max)
   (let ((n 0))
     #'(lambda (_)
@@ -19,8 +18,5 @@
 	    (incf n)
 	    nil))))
 
-(define-symbol-macro stdin
-    (stleem-read-line-driver *standard-input*))
-
-(define-symbol-macro stdout
-    (stleem-write-driver *standard-output*))
+(defun seq (n-max)
+  (loop for n from 0 to n-max collect n))

@@ -10,6 +10,17 @@
 	      do (pipe-push to-pipe out))
 	(pipe-close to-pipe))))
 
+(defmacro filter-lambda-function ((arg-name) &body body)
+  `(flet ((filter-function (,arg-name)
+	    ,@body))
+     #'(lambda (from-pipe to-pipe end-symbol)
+   	 (make-stleem-thread-function
+	  #'filter-function from-pipe to-pipe end-symbol))))
+
+(defmacro define-filter (name (arg-name) &body body)
+  `(setf (fdefinition ',name)
+	 (filter-lambda-function (,arg-name) ,@body)))
+
 ;;; Main loop
 (defun run-stleem (pipeline-start pipeline-funcs
 		   &key (start-symbol t) (end-symbol nil) (extract-values t))
@@ -27,8 +38,8 @@
 	    as from-pipe = first-pipe then to-pipe
 	    as to-pipe = (make-instance 'queue-pipe)
 	    do (push (make-thread
-		      (make-stleem-thread-function
-		       pipeline-func from-pipe to-pipe end-symbol)
+		      (funcall pipeline-func
+			       from-pipe to-pipe end-symbol)
 		      :name "streem worker thread")
 		     threads)
 	    finally
@@ -45,9 +56,17 @@
 ;;; Entry point
 (defmacro stleem ((&key (start-symbol t) (end-symbol nil) (extract-values t))
 		  &body pipelines)
-  `(run-stleem
-    ,(first pipelines)
-    (list ,@(rest pipelines))
+  (flet ((trans-pipe-filter (filter) 	; should be rewrited//
+	   (cond ((symbolp filter)
+		  `(function ,filter))
+		 ((and (listp filter)
+		       (eq (first filter) 'lambda))
+		  `(filter-lambda-function ,@(rest filter)))
+		 (t
+		  filter))))
+    `(run-stleem
+      ,(trans-pipe-filter (first pipelines))
+      (list ,@(mapcar #'trans-pipe-filter (rest pipelines)))
     :start-symbol ,start-symbol
     :end-symbol ,end-symbol
-    :extract-values ,extract-values))
+    :extract-values ,extract-values)))
