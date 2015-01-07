@@ -32,3 +32,22 @@
 	    (t
 	     x)))
     stdout))
+
+;; from 04emit.strm
+(defun repeat-twice ()
+  (stleem ()
+    (seq 100)
+    (lambda (x)
+      (emit x)
+      x)
+    stdout))
+
+;; from 04skip.strm
+(defun pick-even-numbers ()
+  (stleem ()
+    (seq 100)
+    (lambda (x)
+      (when (= (mod x 2) 1)
+	(skip))
+      x)
+    stdout))

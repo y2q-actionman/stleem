@@ -7,7 +7,11 @@
 
 (define-filter (stdin &optional (in *standard-input*)) (_)
   (declare (ignore _))
-  (read-line in nil nil))
+  (let ((l (read-line in nil :eof)))
+    (when (eq l :eof)
+      (return))
+    l))
+	
 
 #+ignore
 (defun seq (n-max)

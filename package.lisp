@@ -3,6 +3,7 @@
 (defpackage #:stleem
   (:use #:cl #:bordeaux-threads #:lparallel.queue)
   (:export #:stleem
+	   #:emit #:skip
 	   #:seq #:stdin #:stdout))
 
 (defpackage #:stleem-example
