@@ -1,49 +1,42 @@
 (in-package :stleem)
 
-#+ignore
-(defun make-stleem-thread-function (pipeline-func from-pipe to-pipe end-symbol)
-  #'(lambda ()
-      (unwind-protect
-	   (loop until (pipe-closed-p from-pipe)
-	      for in = (pipe-pop from-pipe end-symbol)
-	      as out = (funcall pipeline-func in)
-	      until (eq out end-symbol)
-	      do (pipe-push to-pipe out))
-	(pipe-close to-pipe))))
+(defvar *from-pipe*)
+(defvar *to-pipe*)
 
-(defmacro filter-lambda-function ((&rest args) (filter-arg) &body body)
-  (let ((from-pipe (gensym "from-pipe"))
-	(to-pipe (gensym "to-pipe"))
-	(pipe-loop-next (gensym "pipe-loop-next")))
-    `#'(lambda (,@args)
-	 #'(lambda (,from-pipe ,to-pipe)
-	     #'(lambda ()
-		 (unwind-protect
-		      (prog ()
-			 ,pipe-loop-next
-			 (flet ((skip ()
-				  (go ,pipe-loop-next))
-				(emit (x)
-				  (pipe-push ,to-pipe x)))
-			   (declare (ignorable (function skip)
-					       (function emit)))
-			   (when (pipe-closed-p ,from-pipe)
-			     (return))
-			   (emit ((lambda (,filter-arg) ,@body)
-				  (pipe-pop ,from-pipe))))
-			 (go ,pipe-loop-next))
-		   (pipe-close ,to-pipe)))))))
+(defmacro filter-lambda-function ((&rest extra-parameters) (filter-arg)
+				  &body body)
+  (let ((pipe-loop-next (gensym "pipe-loop-next")))
+    `#'(lambda (,@extra-parameters)
+	 #'(lambda ()
+	     (unwind-protect
+		  (prog ()
+		     ,pipe-loop-next
+		     (flet ((skip ()
+			      (go ,pipe-loop-next))
+			    (emit (x)
+			      (pipe-push *to-pipe* x)))
+		       (declare (ignorable (function skip)
+					   (function emit)))
+		       (when (pipe-closed-p *from-pipe*)
+			 (return))
+		       (emit ((lambda (,filter-arg) ,@body)
+			      (pipe-pop *from-pipe*))))
+		     (go ,pipe-loop-next))
+	       (pipe-close *to-pipe*))))))
+
+(defmacro define-filter* ((func-name &rest extra-parameters)
+			  (filter-arg) &body body)
+  `(setf (fdefinition ',func-name)
+	 (filter-lambda-function (,@extra-parameters) (,filter-arg) ,@body)))
 
 (defmacro define-filter (func-spec (filter-arg) &body body)
   (etypecase func-spec
     (list
      (let ((name (first func-spec))
 	   (args (rest func-spec)))
-       `(setf (fdefinition ',name)
-	      (filter-lambda-function (,@args) (,filter-arg) ,@body))))
+       `(define-filter* (,name ,@args) (,filter-arg) ,@body)))
     (symbol
-     `(setf (fdefinition ',func-spec)
-	    (filter-lambda-function nil (,filter-arg) ,@body)))))
+     `(define-filter* (,func-spec) (,filter-arg) ,@body))))
 
 ;;; Main loop
 (defun run-stleem (pipeline-start pipeline-funcs
@@ -62,9 +55,11 @@
 	    as from-pipe = first-pipe then to-pipe
 	    as to-pipe = (make-instance 'queue-pipe)
 	    do (push (make-thread
-		      (funcall pipeline-func
-			       from-pipe to-pipe)
-		      :name "streem worker thread")
+		      (funcall pipeline-func)
+		      :name "streem worker thread"
+		      :initial-bindings
+		      `((*from-pipe* (lambda () ,from-pipe))
+			(*to-pipe* (lambda () ,to-pipe))))
 		     threads)
 	    finally
 	      (setf last-pipe to-pipe)
@@ -82,10 +77,10 @@
 		  &body pipelines)
   (flet ((trans-pipe-filter (filter) 	; should be rewrited//
 	   (cond ((symbolp filter)
-		  `(,filter))
+		  `#',filter)
 		 ((and (listp filter)
 		       (eq (first filter) 'lambda))
-		  `(funcall (filter-lambda-function nil ,@(rest filter))))
+		  `(filter-lambda-function () ,@(rest filter)))
 		 (t
 		  filter))))
     `(run-stleem
