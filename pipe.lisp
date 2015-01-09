@@ -19,7 +19,7 @@
     
 ;;; a pipe made by a queue.
 (defclass queue-pipe (pipe)
-  ((queue :initform (make-queue) :accessor queue-pipe-queue)))
+  ((queue :initarg :queue :initform (make-queue) :accessor queue-pipe-queue)))
 
 (defmethod pipe-close ((pipe queue-pipe))
   (push-queue :queue-pipe-closed
@@ -37,6 +37,25 @@
   (if (pipe-closed-p pipe)
       eof-value
       (pop-queue (queue-pipe-queue pipe))))
+
+;; for mapping sequence to queue-pipe
+(defmethod initialize-instance ((instance queue-pipe)
+				&rest args
+				&key (sequence nil)
+				&allow-other-keys)
+  (if sequence
+      (apply #'call-next-method
+	     instance
+	     :queue (make-queue :initial-contents sequence)
+	     args)
+      (call-next-method)))
+
+(defmethod initialize-instance :after ((instance queue-pipe)
+				       &rest args
+				       &key (allow-append nil)
+				       &allow-other-keys)
+  (unless allow-append
+    (pipe-close instance)))
 
 ;;; Constant-pipe (used for initial stream)
 (defclass constant-pipe (pipe)
@@ -56,22 +75,3 @@
 (defmethod pipe-pop ((cpipe constant-pipe) &optional eof-value)
   (declare (ignore eof-value))
   (constant-pipe-value cpipe))
-
-;;; Sequence-pipe
-(defclass sequence-pipe (queue-pipe)
-  ((queue :initarg :queue :initform nil)
-   (allow-append :initarg :allow-append :initform nil)))
-
-(defmethod shared-initialize ((instance sequence-pipe) slot-names
-			      &rest args
-			      &key (sequence nil) &allow-other-keys)
-  (apply #'call-next-method
-	 instance slot-names
-	 :queue (make-queue :initial-contents sequence)
-	 args))
-
-(defmethod shared-initialize :after ((instance sequence-pipe) slot-names
-				     &rest args)
-  (unless (slot-value instance 'allow-append)
-    (pipe-close instance)))
-

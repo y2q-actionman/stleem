@@ -38,6 +38,7 @@
 
 (defmacro generator-lambda-function ((&rest extra-parameters) ()
 				     &body body)
+  ;; TODO: merge with 'filter-lambda-function'
   (let ((pipe-loop-next (gensym "pipe-loop-next")))
     `#'(lambda (,@extra-parameters)
 	 #'(lambda ()
@@ -68,8 +69,7 @@
 
 ;;; Main loop
 (defun run-pipeline-threads (first-pipe pipeline-funcs)
-  (let ((threads nil)
-	(last-pipe nil))
+  (let ((threads nil))
     (unwind-protect
 	 (loop for pipeline-func in pipeline-funcs
 	    as from-pipe = first-pipe then to-pipe
@@ -81,10 +81,9 @@
 				    (*to-pipe* (lambda () ,to-pipe))))
 		     threads)
 	    finally
-	      (setf last-pipe to-pipe)
-	      (mapc #'join-thread threads))
-      (mapc #'destroy-thread threads))
-    last-pipe))
+	      (mapc #'join-thread threads)
+	      (return (or to-pipe first-pipe)))
+      (mapc #'destroy-thread threads))))
 
 (defun return-from-pipe (last-pipe extract-values)
   (cond ((null last-pipe)
@@ -105,7 +104,7 @@
   
 (defmethod run-stleem ((pipeline-start sequence) pipeline-funcs
 		       &key (extract-values t))
-  (let* ((first-pipe (make-instance 'sequence-pipe :sequence pipeline-start))
+  (let* ((first-pipe (make-instance 'queue-pipe :sequence pipeline-start))
 	 (last-pipe (run-pipeline-threads first-pipe pipeline-funcs)))
     (return-from-pipe last-pipe extract-values)))
   
