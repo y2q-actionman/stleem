@@ -2,7 +2,7 @@
 
 (asdf:defsystem #:stleem
   :description "stleem is a Lisp version of the 'streem' language ( https://github.com/matz/streem )."
-  :license "MIT License"
+  :license "WTFPL"
   :author "YOKOTA Yuki <y2q.actionman@gmail.com>"
   :depends-on (#:bordeaux-threads #:lparallel)
   :components ((:file "package")
